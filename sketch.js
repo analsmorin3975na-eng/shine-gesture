@@ -1,19 +1,19 @@
 // ========== 星光粒子 ==========
 let particles = [];
 let centerX, centerY;
-let stage = 0;
-let stageTimer = 0;
 let reflowSpeed = 0;
+let targetSpeed = 0;
+let currentGesture = "None";
+let stableGesture = "None";
+let gestureHoldFrames = 0;
 
 const stageTexts = [
-  "初始状态（星光冻结）：星光向外扩散的粒子保持在空中，呈现完整的星光效果。",
-  "开始汇聚：外层的星光粒子缓慢向中心移动，轨迹依然清晰可见。",
-  "持续汇聚：更多的星光粒子沿原轨迹回流，逐渐靠近星体。",
-  "加速回流：星光雨进一步收缩，粒子流动速度逐渐加快。",
-  "接近中心：大部分粒子已回到星体附近，形成流动的光环。",
-  "即将完全汇聚：最后的星光粒子缓缓回归，光环逐渐收缩。",
-  "完全收回：所有星光粒子回到星体内部，外部不再有散落的光点。",
-  "最终状态：仅剩中心的五角星，散发稳定的光芒。"
+  "初始状态：星光向外扩散，等待手势控制。",
+  "手掌张开：星光冻结并缓慢回流。",
+  "握拳：星光快速向中心汇聚。",
+  "松手张开：回流减速。",
+  "完全握拳：持续快速收回。",
+  "手离开：星光暂停。"
 ];
 
 class Particle {
@@ -49,10 +49,10 @@ function drawStar(cx, cy, r) {
   fill(255, 215, 120, 230);
   noStroke();
   beginShape();
-  for(let i=0; i<5; i++){
-    let a = TWO_PI * (i*2/5) - HALF_PI;
-    let sx = cx + cos(a)*r;
-    let sy = cy + sin(a)*r;
+  for (let i = 0; i < 5; i++) {
+    let a = TWO_PI * (i * 2 / 5) - HALF_PI;
+    let sx = cx + cos(a) * r;
+    let sy = cy + sin(a) * r;
     vertex(sx, sy);
   }
   endShape(CLOSE);
@@ -64,23 +64,22 @@ let hands;
 let video, canvasHand, ctxHand;
 
 function setup() {
-  // p5画布优先渲染，星光先出来！
   let canvas = createCanvas(900, 600);
   canvas.parent("p5CanvasWrap");
   centerX = width / 2;
   centerY = height / 2;
 
-  for(let i=0; i<800; i++){
+  for (let i = 0; i < 800; i++) {
     particles.push(new Particle());
   }
+
   document.getElementById("resetBtn").onclick = resetAnimation;
   updateStageText();
 
-  // 延迟启动手势识别，不阻塞渲染
   setTimeout(startHandDetect, 600);
 }
 
-function startHandDetect(){
+function startHandDetect() {
   video = document.getElementById('videoInput');
   canvasHand = document.getElementById('handCanvas');
   ctxHand = canvasHand.getContext('2d');
@@ -88,88 +87,114 @@ function startHandDetect(){
   hands = new Hands({
     locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
   });
+
   hands.setOptions({
     maxNumHands: 1,
     modelComplexity: 1,
     minDetectionConfidence: 0.4,
     minTrackingConfidence: 0.4
   });
+
   hands.onResults(onHandResult);
 
   const camera = new Camera(video, {
     onFrame: async () => {
-      await hands.send({image: video});
+      await hands.send({ image: video });
     },
-    width:640,
-    height:480
+    width: 640,
+    height: 480
   });
+
   camera.start();
   document.getElementById("gestureText").innerText = "✅ 摄像头已开启";
 }
 
-function onHandResult(results){
-  ctxHand.save();
-  ctxHand.clearRect(0,0,canvasHand.width, canvasHand.height);
-  ctxHand.drawImage(results.image,0,0,canvasHand.width,canvasHand.height);
-
-  let hasHand = results.multiHandLandmarks.length > 0;
-  let isOpen = false;
-  let isFist = false;
-
-  if(hasHand){
-    let lm = results.multiHandLandmarks[0];
-    drawConnectors(ctxHand, lm, HAND_CONNECTIONS, {color:'#0ff', lineWidth:2});
-    drawLandmarks(ctxHand, lm, {color:'#f0f', radius:3});
-
-    // 掌根
-    let palm = lm[0];
-    // 四个指尖
-    let indexTip = lm[8];
-    let midTip = lm[12];
-    let ringTip = lm[16];
-    let pinkyTip = lm[20];
-
-    // 计算距离
-    let d1 = dist(indexTip.x, indexTip.y, palm.x, palm.y);
-    let d2 = dist(midTip.x, midTip.y, palm.x, palm.y);
-    let d3 = dist(ringTip.x, ringTip.y, palm.x, palm.y);
-    let d4 = dist(pinkyTip.x, pinkyTip.y, palm.x, palm.y);
-    let avg = (d1+d2+d3+d4)/4;
-
-    if(avg > 0.30){
-      isOpen = true;
-    }else if(avg < 0.17){
-      isFist = true;
-    }
-  }
-  ctxHand.restore();
-  updateGestureUI(hasHand, isOpen, isFist);
+function isFingerUp(lm, tipId, pipId) {
+  return lm[tipId].y < lm[pipId].y - 0.03;
 }
 
-function updateGestureUI(hasHand, isOpen, isFist){
+function onHandResult(results) {
+  ctxHand.save();
+  ctxHand.clearRect(0, 0, canvasHand.width, canvasHand.height);
+  ctxHand.drawImage(results.image, 0, 0, canvasHand.width, canvasHand.height);
+
+  let hasHand = results.multiHandLandmarks.length > 0;
+  let fingerCount = 0;
+  let gesture = "None";
+
+  if (hasHand) {
+    let lm = results.multiHandLandmarks[0];
+
+    drawConnectors(ctxHand, lm, HAND_CONNECTIONS, { color: '#0ff', lineWidth: 2 });
+    drawLandmarks(ctxHand, lm, { color: '#f0f', radius: 3 });
+
+    if (isFingerUp(lm, 8, 6)) fingerCount++;
+    if (isFingerUp(lm, 12, 10)) fingerCount++;
+    if (isFingerUp(lm, 16, 14)) fingerCount++;
+    if (isFingerUp(lm, 20, 18)) fingerCount++;
+
+    // 张开手掌：3根以上手指伸直
+    if (fingerCount >= 3) {
+      gesture = "Open_Palm";
+    }
+    // 握拳：0~1根手指伸直
+    else if (fingerCount <= 1) {
+      gesture = "Closed_Fist";
+    }
+    // 半握/过渡手势：保持当前速度不突变
+    else {
+      gesture = stableGesture;
+    }
+  }
+
+  ctxHand.restore();
+  updateGestureUI(hasHand, gesture, fingerCount);
+}
+
+function updateGestureUI(hasHand, gesture, fingerCount) {
   const gestureDom = document.getElementById("gestureText");
   const titleDom = document.getElementById("modeTitle");
   const descDom = document.getElementById("modeDesc");
   const tipDom = document.getElementById("rightTip");
 
-  if(!hasHand){
+  // 手势防抖：连续稳定几帧才切换
+  if (gesture === stableGesture) {
+    gestureHoldFrames++;
+  } else {
+    gestureHoldFrames = 0;
+    currentGesture = gesture;
+  }
+
+  if (gestureHoldFrames > 5) {
+    stableGesture = currentGesture;
+  }
+
+  if (!hasHand) {
     gestureDom.innerText = "未检测到手";
-    reflowSpeed = 0;
-  }else if(isOpen){
-    gestureDom.innerText = "✅ 张开手掌（手势1）";
-    titleDom.innerText = "手势1 · 手掌保持不动";
-    descDom.innerText = "星光雨保持静止，缓慢汇聚";
-    tipDom.innerText = "保持手掌静止 · 星光缓慢汇聚";
-    reflowSpeed = 0.08;
-  }else if(isFist){
-    gestureDom.innerText = "✊ 握拳（手势2）";
-    titleDom.innerText = "手势2 · 握拳快速回流";
-    descDom.innerText = "握拳触发星光快速向中心汇聚";
-    tipDom.innerText = "握拳 · 星光快速收回";
-    reflowSpeed = 0.65;
-  }else{
-    gestureDom.innerText = "🖐 手势过渡中";
-    reflowSpeed = 0.22;
+    titleDom.innerText = "等待手势";
+    descDom.innerText = "手离开画面，星光暂停回流。";
+    tipDom.innerText = "请伸手控制星光";
+    targetSpeed = 0;
+  }
+  else if (stableGesture === "Open_Palm") {
+    gestureDom.innerText = "✅ 张开手掌 · 星光慢收";
+    titleDom.innerText = "手势1 · 手掌张开";
+    descDom.innerText = "手掌张开，星光减速并保持缓慢回流。";
+    tipDom.innerText = "张开手 → 慢收";
+    targetSpeed = 0.04;
+  }
+  else if (stableGesture === "Closed_Fist") {
+    gestureDom.innerText = "✊ 握拳 · 星光快收";
+    titleDom.innerText = "手势2 · 握拳";
+    descDom.innerText = "握拳，星光快速向中心五角星汇聚。";
+    tipDom.innerText = "握拳 → 快收";
+    targetSpeed = 0.75;
+  }
+  else {
+    gestureDom.innerText = "🖐 过渡中 · 保持当前速度";
+    titleDom.innerText = "手势控制中";
+    descDom.innerText = "手势未完全定型，星光保持当前回流速度。";
+    tipDom.innerText = "完全张开或完全握拳";
   }
 }
 
@@ -178,28 +203,27 @@ function draw() {
   centerX = width / 2;
   centerY = height / 2;
 
-  stageTimer += deltaTime;
-  let stageDuration = reflowSpeed < 0.1 ? 1400 : 700;
-  if(stageTimer > stageDuration && stage < 7) {
-    stageTimer = 0;
-    stage ++;
-    updateStageText();
-  }
+  // 平滑过渡速度，避免忽快忽慢
+  reflowSpeed = lerp(reflowSpeed, targetSpeed, 0.08);
 
-  for(let p of particles) {
+  for (let p of particles) {
     p.update(reflowSpeed);
     p.show();
   }
+
   drawStar(centerX, centerY, 55);
 }
 
 function resetAnimation() {
-  stage = 0;
-  stageTimer = 0;
-  for(let p of particles) p.reset();
+  for (let p of particles) p.reset();
+  reflowSpeed = 0;
+  targetSpeed = 0;
+  stableGesture = "None";
+  currentGesture = "None";
+  gestureHoldFrames = 0;
   updateStageText();
 }
 
 function updateStageText() {
-  document.getElementById("stageText").innerText = stageTexts[stage];
+  document.getElementById("stageText").innerText = stageTexts[0];
 }
