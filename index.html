@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>星光手势交互 校园稳定版</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <!-- mediapipe hands cdn -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+</head>
+<body>
+  <div class="container">
+    <div class="header-panel">
+      <div class="title-wrap">
+        <h2 id="modeTitle">等待识别手势</h2>
+        <p id="modeDesc">请将手放到摄像头前，张开手掌或者握拳进行交互</p >
+      </div>
+      <div class="tip-right" id="rightTip">星光交互 · 摄像头手势识别</div>
+    </div>
+
+    <div class="wrap-row">
+      <div id="p5CanvasWrap"></div>
+      <div class="cam-wrap">
+        <h4>摄像头画面</h4>
+        <video id="videoInput" autoplay playsinline></video>
+        <canvas id="handCanvas"></canvas>
+      </div>
+    </div>
+
+    <div class="control-panel">
+      <div class="stage-info">
+        当前阶段：<span id="stageText">初始状态（星光冻结）</span>
+      </div>
+      <div class="state-info">
+        识别状态：<span id="gestureText">准备启动</span>
+      </div>
+      <div class="reset-wrap">
+        <button id="resetBtn">重置星光</button>
+      </div>
+    </div>
+  </div>
+  <script src="sketch.js"></script>
+</body>
+</html>

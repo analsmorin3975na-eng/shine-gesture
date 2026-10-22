@@ -1,0 +1,101 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "Microsoft Yahei", sans-serif;
+}
+body {
+  background: #080c20;
+  color: #fff;
+  min-height: 100vh;
+  padding: 20px;
+}
+.container {
+  max-width: 1300px;
+  margin: 0 auto;
+}
+.header-panel {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(22, 34, 70, 0.7);
+  border-radius: 12px;
+  padding: 16px 24px;
+  margin-bottom: 16px;
+  border: 1px solid rgba(100,140,255,0.25);
+}
+.title-wrap h2 {
+  font-size: 22px;
+  color: #ffe8a8;
+  margin-bottom: 6px;
+}
+.title-wrap p {
+  font-size: 14px;
+  color: #b8c8f0;
+}
+.tip-right {
+  color: #ffe8a8;
+  font-size:14px;
+}
+.wrap-row{
+  display:flex;
+  gap:16px;
+}
+#p5CanvasWrap {
+  flex: 1;
+  background: linear-gradient(180deg, #070b22 0%, #141b40 100%);
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(100,140,255,0.25);
+}
+canvas {
+  display:block;
+  width:100%;
+}
+.cam-wrap{
+  width:320px;
+  background:#111836;
+  border-radius:12px;
+  padding:12px;
+  border:1px solid rgba(100,140,255,0.25);
+  position:relative;
+}
+.cam-wrap h4{
+  color:#ffe8a8;
+  margin-bottom:8px;
+  text-align:center;
+}
+#videoInput{
+  width:100%;
+  transform: scaleX(-1);
+}
+#handCanvas{
+  width:100%;
+  height:calc(100% - 28px);
+  position:absolute;
+  top:28px;
+  left:12px;
+  transform: scaleX(-1);
+}
+.control-panel {
+  margin-top:16px;
+  background: rgba(22, 34, 70, 0.7);
+  border-radius:12px;
+  padding:16px 24px;
+  border:1px solid rgba(100,140,255,0.25);
+  display:flex;
+  align-items:center;
+  gap:24px;
+  flex-wrap:wrap;
+}
+.stage-info, .state-info {
+  color:#ffe8a8;
+}
+#resetBtn {
+  padding: 8px 16px;
+  background: #c28a29;
+  border:none;
+  color:#fff;
+  border-radius:6px;
+  cursor:pointer;
+}
